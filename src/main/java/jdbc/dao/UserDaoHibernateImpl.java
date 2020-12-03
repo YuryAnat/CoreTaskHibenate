@@ -7,6 +7,7 @@ import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class UserDaoHibernateImpl implements UserDao {
@@ -35,7 +36,6 @@ public class UserDaoHibernateImpl implements UserDao {
         factory = Util.getHibernateFactory();
     }
 
-
     @Override
     public void createUsersTable() {
         executeQuery(createUserTable);
@@ -46,56 +46,78 @@ public class UserDaoHibernateImpl implements UserDao {
         executeQuery(dropUserTable);
     }
 
-    private void executeQuery(String dropUserTable) {
-        Session session = factory.openSession();
-        Transaction transaction = session.beginTransaction();
-        try{
-            session.createSQLQuery(dropUserTable).executeUpdate();
-        }catch (Exception e){
-            System.err.println(e.getMessage());
-        }
-        transaction.commit();
-        session.close();
+    @Override
+    public void cleanUsersTable() {
+        executeQuery(clearUser);
     }
 
     @Override
     public void saveUser(String name, String lastName, byte age) {
         Session session = factory.openSession();
         Transaction transaction = session.beginTransaction();
-        Query query = session.createSQLQuery(insertUser);
-        query.setParameter("name", name);
-        query.setParameter("last_name", lastName);
-        query.setParameter("age", age);
-        query.executeUpdate();
-        transaction.commit();
-        session.close();
+        try {
+            Query query = session.createSQLQuery(insertUser);
+            query.setParameter("name", name);
+            query.setParameter("last_name", lastName);
+            query.setParameter("age", age);
+            query.executeUpdate();
+            transaction.commit();
+        } catch (Exception e) {
+            transaction.rollback();
+            System.err.println(e.getMessage());
+        }finally {
+            session.close();
+        }
     }
 
     @Override
     public void removeUserById(long id) {
         Session session = factory.openSession();
         Transaction transaction = session.beginTransaction();
-        Query query = session.createSQLQuery(removeUser);
-        query.setParameter("id", id);
-        query.executeUpdate();
-        transaction.commit();
-        session.close();
+        try {
+            Query query = session.createSQLQuery(removeUser);
+            query.setParameter("id", id);
+            query.executeUpdate();
+            transaction.commit();
+        } catch (Exception e) {
+            transaction.rollback();
+            System.err.println(e.getMessage());
+        }finally {
+            session.close();
+        }
     }
 
     @Override
     public List<User> getAllUsers() {
-        List<User> result;
+        List<User> result = new ArrayList<>();
         Session session = factory.openSession();
         Transaction transaction = session.beginTransaction();
-        Query query = session.createSQLQuery(getAllUser).addEntity(User.class);
-        result = query.list();
-        transaction.commit();
-        session.close();
+        try {
+            Query query = session.createSQLQuery(getAllUser).addEntity(User.class);
+            result = (List<User>) query.list();
+            transaction.commit();
+        } catch (Exception e) {
+            transaction.rollback();
+            System.err.println(e.getMessage());
+        } finally {
+            session.close();
+        }
         return result;
     }
 
-    @Override
-    public void cleanUsersTable() {
-        executeQuery(clearUser);
+    private void executeQuery(String dropUserTable) {
+        Session session = factory.openSession();
+        Transaction transaction = session.beginTransaction();
+        try {
+            session.createSQLQuery(dropUserTable).executeUpdate();
+            transaction.commit();
+        } catch (Exception e) {
+            if (null != transaction){
+                transaction.rollback();
+            }
+            System.err.println(e.getMessage());
+        } finally {
+            session.close();
+        }
     }
 }
